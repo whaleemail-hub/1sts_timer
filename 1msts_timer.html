@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1分鐘坐站測試與恢復期計時器</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #121a2b;
+      --muted: #94a3b8;
+      --text: #e5eefc;
+      --accent: #60a5fa;
+      --accent-2: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --border: #24324d;
+      --flash: rgba(96, 165, 250, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, "Noto Sans TC", sans-serif;
+      background: radial-gradient(circle at top, #15203a 0%, var(--bg) 45%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .card {
+      background: rgba(18, 26, 43, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: 0 18px 50px rgba(0,0,0,0.35);
+    }
+
+    h1 {
+      font-size: clamp(28px, 5vw, 42px);
+      margin: 0 0 8px;
+      line-height: 1.15;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 16px;
+      margin-bottom: 18px;
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      letter-spacing: 0.02em;
+    }
+
+    .timer-box {
+      text-align: center;
+      padding: 18px;
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(96,165,250,0.12), rgba(255,255,255,0.02));
+      border: 1px solid var(--border);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+    }
+
+    .flash {
+      animation: flashPulse 0.65s ease;
+    }
+
+    @keyframes flashPulse {
+      0% { box-shadow: 0 0 0 0 var(--flash); background: rgba(96,165,250,0.28); }
+      100% { box-shadow: 0 0 0 28px rgba(96,165,250,0); background: linear-gradient(180deg, rgba(96,165,250,0.12), rgba(255,255,255,0.02)); }
+    }
+
+    .phase {
+      font-size: clamp(18px, 3.6vw, 30px);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .phase.phase-main { color: var(--accent); }
+    .phase.phase-recovery { color: var(--accent-2); }
+    .phase.phase-idle { color: var(--muted); }
+    .phase.phase-done { color: var(--warn); }
+
+    .time {
+      font-size: clamp(64px, 18vw, 132px);
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      line-height: 1;
+      margin: 10px 0 14px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hint {
+      min-height: 44px;
+      font-size: clamp(18px, 4vw, 30px);
+      font-weight: 700;
+      color: #fde68a;
+    }
+
+    .mini {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .controls, .settings {
+      display: grid;
+      gap: 12px;
+    }
+
+    .settings {
+      grid-template-columns: 1fr;
+      margin-bottom: 16px;
+    }
+
+    .setting-group {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 14px;
+    }
+
+    .label {
+      display: block;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .radio-row, .check-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .radio-pill, .check-pill {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 10px 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.03);
+      font-size: 15px;
+    }
+
+    input[type="radio"], input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #60a5fa;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 12px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 20px;
+      padding: 18px 14px;
+      font-size: clamp(18px, 4.2vw, 28px);
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.08s ease, opacity 0.15s ease;
+      min-height: 74px;
+    }
+
+    button:active { transform: scale(0.98); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-start { background: #2563eb; color: white; }
+    .btn-pause { background: #f59e0b; color: #111827; }
+    .btn-reset { background: #334155; color: white; }
+    .btn-audio { background: #16a34a; color: white; }
+
+    .footer-note {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    @media (min-width: 760px) {
+      .top-grid {
+        grid-template-columns: 1.5fr 1fr;
+      }
+      .settings {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>1分鐘坐站測試計時器</h1>
+      <div class="subtitle">先倒數 1 分鐘測試，再自動進入 180 秒恢復期倒數。恢復期每 15 秒可語音提示與螢幕閃爍提醒。</div>
+
+      <div class="settings">
+        <div class="setting-group">
+          <div class="label">提示設定</div>
+          <div class="check-row">
+            <label class="check-pill"><input type="checkbox" id="beepToggle" checked> 開啟每 15 秒提示音</label>
+            <label class="check-pill"><input type="checkbox" id="flashToggle" checked> 開啟每 15 秒螢幕閃爍</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="top-grid">
+        <div class="timer-box" id="timerBox">
+          <div class="phase phase-idle" id="phaseLabel">待命中</div>
+          <div class="time" id="timeDisplay">01:00</div>
+          <div class="hint" id="hintText">按下開始後進入 1 分鐘測試</div>
+          <div class="mini" id="subHint">測試結束後會自動進入恢復期</div>
+        </div>
+
+        <div class="controls">
+          <div class="panel-title">操作</div>
+          <div class="button-grid">
+            <button class="btn-start" id="startBtn">開始</button>
+            <button class="btn-pause" id="pauseBtn" disabled>暫停</button>
+            <button class="btn-reset" id="resetBtn">重設</button>
+            <button class="btn-audio" id="audioBtn">啟用音效</button>
+          </div>
+          <div class="footer-note">
+            提醒：部分手機或瀏覽器需要先按一次「啟用音效」或「開始」，提示音才會正常播放。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const MAIN_SECONDS = 60;
+    const timerBox = document.getElementById('timerBox');
+    const phaseLabel = document.getElementById('phaseLabel');
+    const timeDisplay = document.getElementById('timeDisplay');
+    const hintText = document.getElementById('hintText');
+    const subHint = document.getElementById('subHint');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const audioBtn = document.getElementById('audioBtn');
+    const beepToggle = document.getElementById('beepToggle');
+    const flashToggle = document.getElementById('flashToggle');
+
+    let audioContext = null;
+    let phase = 'idle'; // idle, main, recovery, done
+    let running = false;
+    let remaining = MAIN_SECONDS;
+    let recoverySeconds = 180;
+    let intervalId = null;
+    let lastRecoveryCue = 0;
+
+    function getRecoverySelection() {
+      return 180;
+    }
+
+    function pad(num) {
+      return String(num).padStart(2, '0');
+    }
+
+    function formatTime(total) {
+      const min = Math.floor(total / 60);
+      const sec = total % 60;
+      return `${pad(min)}:${pad(sec)}`;
+    }
+
+    function formatElapsedLabel(seconds) {
+      if (seconds < 60) return `${seconds} 秒`;
+      const min = Math.floor(seconds / 60);
+      const sec = seconds % 60;
+      const minText = min === 2 ? '兩' : String(min);
+      if (sec === 0) return `${minText} 分鐘`;
+      return `${minText} 分 ${sec} 秒`;
+    }
+
+    function updateDisplay() {
+      timeDisplay.textContent = formatTime(remaining);
+
+      if (phase === 'idle') {
+        phaseLabel.textContent = '待命中';
+        phaseLabel.className = 'phase phase-idle';
+        hintText.textContent = '按下開始後進入 1 分鐘測試';
+        subHint.textContent = '恢復期固定 180 秒';
+      } else if (phase === 'main') {
+        phaseLabel.textContent = '1 分鐘坐站測試中';
+        phaseLabel.className = 'phase phase-main';
+        hintText.textContent = '請專心倒數 1 分鐘';
+        subHint.textContent = '測試結束後自動切換到恢復期';
+      } else if (phase === 'recovery') {
+        const elapsed = recoverySeconds - remaining;
+        phaseLabel.textContent = '恢復期監測中';
+        phaseLabel.className = 'phase phase-recovery';
+        if (elapsed > 0 && elapsed % 15 === 0) {
+          hintText.textContent = `現在該記錄 ${formatElapsedLabel(elapsed)}`;
+        } else {
+          const next = Math.min(Math.ceil(Math.max(elapsed, 1) / 15) * 15, recoverySeconds);
+          hintText.textContent = `下一個記錄點：${formatElapsedLabel(next)}`;
+        }
+        subHint.textContent = '恢復期總長 180 秒';
+      } else if (phase === 'done') {
+        phaseLabel.textContent = '完成';
+        phaseLabel.className = 'phase phase-done';
+        hintText.textContent = '測試與恢復期已完成';
+        subHint.textContent = '可按重設後重新開始';
+      }
+    }
+
+    function flashScreen() {
+      if (!flashToggle.checked) return;
+      timerBox.classList.remove('flash');
+      void timerBox.offsetWidth;
+      timerBox.classList.add('flash');
+    }
+
+    async function ensureAudio() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+    }
+
+    function speak(text) {
+      if (!beepToggle.checked || !('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-TW';
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    async function tone(freq = 880, durationMs = 140, type = 'sine', gainValue = 0.05) {
+      try {
+        await ensureAudio();
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.type = type;
+        oscillator.frequency.value = freq;
+        gain.gain.value = gainValue;
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.start();
+        setTimeout(() => {
+          oscillator.stop();
+        }, durationMs);
+      } catch (e) {
+        console.warn('Audio unavailable', e);
+      }
+    }
+
+    async function announce(text, withTone = true) {
+      if (!beepToggle.checked) return;
+      if (withTone) {
+        await tone(880, 90, 'sine', 0.04);
+      }
+      speak(text);
+    }
+
+    async function announceRecoveryPoint(seconds) {
+      await announce(formatElapsedLabel(seconds), true);
+    }
+
+    async function announcePhase(text) {
+      await announce(text, true);
+    }
+
+    async function longTone() {
+      await tone(659, 400, 'triangle', 0.07);
+    }
+
+    function setButtons() {
+      startBtn.disabled = running;
+      pauseBtn.disabled = !running;
+      pauseBtn.textContent = running ? '暫停' : '繼續';
+    }
+
+    function clearTimer() {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    }
+
+    function resetAll() {
+      clearTimer();
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      phase = 'idle';
+      running = false;
+      recoverySeconds = getRecoverySelection();
+      remaining = MAIN_SECONDS;
+      lastRecoveryCue = 0;
+      updateDisplay();
+      setButtons();
+    }
+
+    function switchToRecovery() {
+      phase = 'recovery';
+      recoverySeconds = getRecoverySelection();
+      remaining = recoverySeconds;
+      lastRecoveryCue = 0;
+      flashScreen();
+      announcePhase('開始恢復期監測');
+      updateDisplay();
+    }
+
+    function finishAll() {
+      clearTimer();
+      running = false;
+      phase = 'done';
+      remaining = 0;
+      updateDisplay();
+      longTone();
+      speak('三分鐘，恢復期結束');
+      setButtons();
+    }
+
+    function tick() {
+      if (remaining > 0) {
+        remaining -= 1;
+      }
+
+      if (phase === 'main') {
+        if (remaining === 30) {
+          announce('30 秒了，加油', true);
+        }
+        updateDisplay();
+        if (remaining <= 0) {
+          switchToRecovery();
+        }
+        return;
+      }
+
+      if (phase === 'recovery') {
+        const elapsed = recoverySeconds - remaining;
+        if (elapsed > 0 && elapsed % 15 === 0 && elapsed !== lastRecoveryCue) {
+          lastRecoveryCue = elapsed;
+          flashScreen();
+          announceRecoveryPoint(elapsed);
+          hintText.textContent = `現在該記錄 ${formatElapsedLabel(elapsed)}`;
+        }
+        updateDisplay();
+        if (remaining <= 0) {
+          finishAll();
+        }
+      }
+    }
+
+    function startTimer() {
+      if (running) return;
+      clearTimer();
+      if (phase === 'idle' || phase === 'done') {
+        phase = 'main';
+        remaining = MAIN_SECONDS;
+        lastRecoveryCue = 0;
+        updateDisplay();
+        announce('請開始', true);
+      }
+      running = true;
+      setButtons();
+      ensureAudio().catch(() => {});
+      intervalId = setInterval(tick, 1000);
+    }
+
+    function pauseTimer() {
+      if (!running) {
+        if (phase === 'main' || phase === 'recovery') {
+          running = true;
+          setButtons();
+          intervalId = setInterval(tick, 1000);
+        }
+        return;
+      }
+      running = false;
+      clearTimer();
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setButtons();
+      pauseBtn.textContent = '繼續';
+    }
+
+    startBtn.addEventListener('click', startTimer);
+    pauseBtn.addEventListener('click', pauseTimer);
+    resetBtn.addEventListener('click', resetAll);
+    audioBtn.addEventListener('click', async () => {
+      await ensureAudio();
+      speak('音效已啟用');
+      audioBtn.textContent = '音效已啟用';
+    });
+
+
+    updateDisplay();
+    setButtons();
+  </script>
+</body>
+</html>
